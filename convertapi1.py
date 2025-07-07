@@ -4,6 +4,7 @@ import tempfile
 import fitz  # PyMuPDF
 from pdf2image import convert_from_path
 import pytesseract
+import pdfplumber
 
 app = Flask(__name__)
 
@@ -18,6 +19,24 @@ def extract_text_pymupdf(file_path):
             extracted_text += block[4].strip() + "\n\n"
 
     doc.close()
+    return extracted_text.strip()
+
+def extract_text_with_tables(file_path):
+    extracted_text = ""
+
+    # Extract raw text using PyMuPDF
+    extracted_text += extract_text_pymupdf(file_path) + "\n\n"
+
+    # Extract tables using pdfplumber
+    with pdfplumber.open(file_path) as pdf:
+        for page_number, page in enumerate(pdf.pages, start=1):
+            tables = page.extract_tables()
+            for table_index, table in enumerate(tables, start=1):
+                extracted_text += f"\n\nTable found on Page {page_number}, Table {table_index}:\n"
+                for row in table:
+                    row_text = " | ".join(cell.strip() if cell else "" for cell in row)
+                    extracted_text += row_text + "\n"
+
     return extracted_text.strip()
 
 def extract_text_ocr(file_path):
@@ -45,10 +64,10 @@ def extract_pdf_text():
         file_path = os.path.join(temp_dir, file.filename)
         file.save(file_path)
 
-        # Step 1: Try PyMuPDF
-        text = extract_text_pymupdf(file_path)
+        # Try text and table extraction
+        text = extract_text_with_tables(file_path)
 
-        # Step 2: If PyMuPDF returns too little text, fallback to OCR
+        # Fallback to OCR if extraction is too little
         if len(text.strip()) < 50:
             text = extract_text_ocr(file_path)
 
@@ -61,4 +80,3 @@ def extract_pdf_text():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
-
