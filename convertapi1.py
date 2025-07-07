@@ -1,29 +1,23 @@
 from flask import Flask, request, jsonify
 import os
 import tempfile
-import pdfplumber
+import fitz  # PyMuPDF
 from pdf2image import convert_from_path
 import pytesseract
 
 app = Flask(__name__)
 
-def extract_text_with_tables(file_path):
+def extract_text_pymupdf(file_path):
+    doc = fitz.open(file_path)
     extracted_text = ""
 
-    with pdfplumber.open(file_path) as pdf:
-        for page in pdf.pages:
-            # Extract plain text
-            page_text = page.extract_text()
-            if page_text:
-                extracted_text += page_text + "\n\n"
+    for page in doc:
+        blocks = page.get_text("blocks")
+        blocks.sort(key=lambda b: (b[1], b[0]))
+        for block in blocks:
+            extracted_text += block[4].strip() + "\n\n"
 
-            # Extract tables
-            tables = page.extract_tables()
-            for table in tables:
-                for row in table:
-                    extracted_text += "\t".join([cell if cell else '' for cell in row]) + "\n"
-                extracted_text += "\n"
-
+    doc.close()
     return extracted_text.strip()
 
 def extract_text_ocr(file_path):
@@ -51,10 +45,10 @@ def extract_pdf_text():
         file_path = os.path.join(temp_dir, file.filename)
         file.save(file_path)
 
-        # Step 1: Try pdfplumber
-        text = extract_text_with_tables(file_path)
+        # Step 1: Try PyMuPDF
+        text = extract_text_pymupdf(file_path)
 
-        # Step 2: If very little text found, fallback to OCR
+        # Step 2: If PyMuPDF returns too little text, fallback to OCR
         if len(text.strip()) < 50:
             text = extract_text_ocr(file_path)
 
@@ -66,4 +60,5 @@ def extract_pdf_text():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
+
