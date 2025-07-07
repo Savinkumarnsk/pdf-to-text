@@ -60,7 +60,7 @@ def extract_pdf_text():
 
         os.remove(file_path)
 
-        return jsonify({"extracted_text": text}), 200
+        return jsonify({"data": text}), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
