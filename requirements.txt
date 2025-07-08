@@ -3,4 +3,3 @@ PyMuPDF
 pdf2image
 pytesseract
 Pillow
-pdfplumber
